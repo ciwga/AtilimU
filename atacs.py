@@ -213,7 +213,7 @@ class Atacs_Student:
         df = pd.read_html(fpage.text)[2]
 
         y = df[df.columns[-1]]
-        y = y.str.replace('₺', '').str.strip().str.replace(',', '.')
+        y = y.str.replace('\u20ba', '').str.strip().str.replace(',', '.')
         df[df.columns[-1]] = y
         df[df.columns[-1]] = df[df.columns[-1]].astype(float)
         df.to_csv('atilim_my_financial_pay_data.csv')
