@@ -35,7 +35,8 @@ class Atacs_Student:
 
         tokenUri = session.get(opc_uri)
         soup = BeautifulSoup(tokenUri.content, 'html.parser')
-        token = soup.find('input', attrs={'name': '__RequestVerificationToken'})
+        token = soup.find('input',
+                          attrs={'name': '__RequestVerificationToken'})
 
         select_term = soup.find('select', attrs={'id': 'DONEM_ID'})
         current_term = select_term.option['value']
@@ -43,7 +44,8 @@ class Atacs_Student:
         # option = soup2.find_all('option')
         # term_codes = [value['value'] for value in option]
         # term_names = [value.text for value in option]
-        # terms_dict = {key: value for key, value in zip(term_codes, term_names)}
+        # terms_dict = {key: value \
+        # for key, value in zip(term_codes, term_names)}
 
         payload = {
             '__RequestVerificationToken': token['value'],
@@ -129,7 +131,8 @@ class Atacs_Student:
                     }
                     temp.append(course_dict_o)
 
-            with open('opened_curriculum_courses.json', 'w', encoding='utf-8') as aec:
+            with open('opened_curriculum_courses.json', 'w', encoding='utf-8')\
+                 as aec:
                 aec.write(json.dumps(temp, indent=4, ensure_ascii=False))
 
         if os.path.isfile('all_opened_courses.csv'):
@@ -141,15 +144,21 @@ class Atacs_Student:
     def is_lesson_opened(self, *code: str) -> None:
         if not os.path.isfile('opened_curriculum_courses.json'):
             self.opened_lessons_database()
-        with open('opened_curriculum_courses.json', 'r', encoding='utf-8') as f:
+        with open('opened_curriculum_courses.json', 'r', encoding='utf-8')\
+             as f:
             reader = json.load(f)
             lessons = [lc['lesson'] for lc in reader]
 
         def check(*args):
             print('*'*50)
+            store = []
             for i in args[0]:
+                store.append(i)
                 if i in lessons:
                     print(f'{i} is opened')
+                    store.remove(i)
+            if store:
+                print(f'The lesson {store} is not opened!')
         check(code)
 
     def received_messages(self, uri=atacs_uri) -> tuple:
@@ -183,15 +192,16 @@ class Atacs_Student:
             'Tip': '1'
         }
 
-        for ix in range(len(df['id'])):
-            r_uri = f"{uri}/OgrenciMesaj/Ogrenci_MesajGoruntule/{df['id'][ix]}"
-            h = session.get(r_uri, data=payload)
-            soup = BeautifulSoup(h.content, 'html.parser')
+        with open('my_atacs_messages.html', 'a+', encoding='utf-8') as fh:
+            for ix in range(len(df['id'])):
+                m = f"{uri}/OgrenciMesaj/Ogrenci_MesajGoruntule/{df['id'][ix]}"
+                h = session.get(m, data=payload)
+                soup = BeautifulSoup(h.content, 'html.parser')
 
-            sender = soup.find('input', attrs={'id': 'Name'})['value']
-            subject = soup.find('input', attrs={'id': 'Konu'})['value']
-            message = soup.find('textarea', attrs={'id': 'Icerik'}).text
-            with open('my_atacs_messages.html', 'a+', encoding='utf-8') as fh:
+                sender = soup.find('input', attrs={'id': 'Name'})['value']
+                subject = soup.find('input', attrs={'id': 'Konu'})['value']
+                message = soup.find('textarea', attrs={'id': 'Icerik'}).text
+
                 fh.seek(0)
                 if message.strip() not in fh.read():
                     fh.write(f'<p><b>From:</b> {sender}</p>\n')
@@ -217,11 +227,15 @@ class Atacs_Student:
         df[df.columns[-1]] = y
         df[df.columns[-1]] = df[df.columns[-1]].astype(float)
         df.to_csv('atilim_my_financial_pay_data.csv')
-        collection = df[df[df.columns[-3]] == 'Tahsilat']
-        total = collection[collection.columns[-1]].sum()
-        print(f'Paid total money: {total}₺')
+        try:
+            collection = df[df[df.columns[-3]] == 'Tahsilat']
+        except KeyError:
+            collection = df[df[df.columns[-3]] == 'Collection']
 
-    def save_kvkk_form(self, uri=atacs_uri):
+        total = collection[collection.columns[-1]].sum()
+        print(f'Paid total money: {total}\u20ba')
+
+    def save_kvkk_form(self, uri=atacs_uri) -> None:
         kvkk_uri = f'{uri}/Kvkk/ReviewForm'
         session = self.auth()
         form = session.get(kvkk_uri)
@@ -229,3 +243,45 @@ class Atacs_Student:
         texts = soup.find('div', attrs={'class': 'content'})
         with open('atilim_kvkk_form.html', 'w', encoding='utf-8') as kvkk:
             kvkk.write(str(texts))
+
+    def save_term_notes(self, student_number: str, uri=atacs_uri) -> None:
+        notGorme = f'{uri}/NotGorme'
+        session = self.auth()
+        termPage = session.get(notGorme)
+        soup = BeautifulSoup(termPage.content, 'html.parser')
+        select_term = soup.find('select', attrs={'id': 'Donem'})
+        soup2 = BeautifulSoup(str(select_term), 'html.parser')
+        option = soup2.find_all('option')
+        term_names = [value.text for value in option][::-1]
+        del term_names[-1]
+        with open('my_course_notes.html', 'a+', encoding='utf-8') as f:
+            for term in term_names:
+
+                payload = {
+                    'OGRENCI': student_number,
+                    'Donem': term
+                }
+                postPage = session.post(notGorme, data=payload)
+                soup3 = BeautifulSoup(postPage.content, 'html.parser')
+
+                div_grade = soup3.find_all('div', attrs={'class': 'col-md-4'})
+                grade = [arth.text for arth in div_grade][-2]
+                cum_grade = [arth.text for arth in div_grade][-1]
+
+                table = soup3.find('table', attrs={'id': 'myTable02'})
+                table2 = soup3.find('table', attrs={'id': 'myTable03'})
+                f.seek(0)
+                if term not in f.read():
+                    f.write(f"<p style='margin-bottom:0;'>\
+                        <b>{'*'*85}</b></p>")
+                    f.write(f"<p style='margin:0;padding-top:0;'>\
+                        <b>Term</b>: {term}</p>")
+                    f.write(f"<p style='margin:0;padding-top:0;'>\
+                        <b>Grade Point Average</b>: {grade}</p>")
+                    f.write(f"<p style='margin:0;padding-top:0;'>\
+                        <b>Cumulative Grade Point Average</b>:\
+                            {cum_grade}</p>")
+                    f.write(str(table))
+            f.write(f"<p style='margin-bottom:0;'>\
+                <b>{'*'*85}</b></p>")
+            f.write(str(table2))
