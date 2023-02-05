@@ -6,6 +6,11 @@ import json
 import os
 
 
+class LoginError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+
+
 class atilim_kimlik:
 
     user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'\
@@ -52,12 +57,15 @@ class atilim_kimlik:
 
         with requests.Session() as session:
             session.headers.update(header)
-            session.post(uri, json=payload)
-            return session
+            post = session.post(uri, json=payload)
+            if json.loads(post.content)['success'] is False:
+                raise LoginError('Invalid username or password')
+            else:
+                return session
 
     def profile_atilim(self, profile=profile_uri) -> tuple:
         saml2 = f'{profile}/saml2/acs'
-        login = self.login(self.username, self.password)
+        login = self.login()
         _getSaml2 = login.get(profile)
         _saml2Value = _getSaml2.text[1079:19727]
 
@@ -98,3 +106,8 @@ class atilim_kimlik:
 
         with open('my_profile.json', 'w', encoding='utf-8') as my:
             json.dump(person, my, indent=4, ensure_ascii=False)
+
+
+if __name__ == '__main__':
+    atilim = atilim_kimlik()
+    atilim.save_profile_atilim()
