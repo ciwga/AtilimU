@@ -13,13 +13,15 @@ class Atacs_Student:
     def auth(self, uri=atacs_uri) -> atilim_kimlik.login:
         auth_uri = f'{uri}/Auth/AssertionConsumerService'
         session = atilim_kimlik().login()
-        saml2 = session.get(uri)
-        saml2Value = saml2.text[1098:13838]
-        relaystate = saml2.text[13888:13901]
+        saml = session.get(uri)
+
+        soup = BeautifulSoup(saml.content, 'html.parser')
+        samlR = soup.find('input', attrs={'name': 'SAMLResponse'})['value']
+        relayS = soup.find('input', attrs={'name': 'RelayState'})['value']
 
         payload = {
-            'SAMLResponse': saml2Value,
-            'RelayState': relaystate
+            'SAMLResponse': samlR,
+            'RelayState': relayS
         }
         session.post(auth_uri, data=payload)
 
