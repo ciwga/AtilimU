@@ -74,9 +74,35 @@ class Atilim_Moodle:
             f.write(json.dumps(jsonobject, indent=4, ensure_ascii=False))
         print('Fetched your taken courses database!')
         if check:
-            self.ann_messages()
+            self.save_ann_messages()
 
-    def ann_messages(self):
+    def retriever(self, data: list) -> tuple:
+        store = {idx['fullname']: idx['viewurl'] for idx in data}
+        indexed_store = {ix: name for ix, name in enumerate(store.keys(), 1)}
+        store_shorts = {idx['fullname']: idx['shortname'] for idx in data}
+        for i, j in indexed_store.items():
+            print('*'*70)
+            print(i, j)
+        print('*'*70)
+
+        while True:
+            try:
+                i_input = int(input('Enter the index number of the course: '))
+                selected_link = [store[indexed_store[i_input]]]
+                shortname = store_shorts[indexed_store[i_input]]
+                break
+            except KeyError:
+                print('Out of index !!')
+
+        if os.name == 'nt':
+            os.system('cls')
+        elif os.name == 'posix':
+            os.system('clear')
+        else:
+            pass
+        return selected_link, shortname
+
+    def save_ann_messages(self, save_all=False):
         ''' Save all course announcements
             that you enrolled in'''
         session, sesskey = self.auth_moodle()
@@ -86,9 +112,14 @@ class Atilim_Moodle:
             with open(jsonfile, 'r', encoding='utf-8') as j:
                 jfile = json.loads(j.read())
                 data = jfile[0]['data']
-                urls = (idx['viewurl'] for idx in data)
+                if save_all:
+                    urls = (idx['viewurl'] for idx in data)
+                    filename = 'my_moodle_course_announcements.html'
+                else:
+                    urls, shortname = self.retriever(data)
+                    filename = f"{urls[0].split('=')[1]}_{shortname}.html"
             count = 0
-            with open('my_moodle_course_announcements.html', 'w',
+            with open(filename, 'w',
                       encoding='utf-8') as af:
                 for url in urls:
                     page = session.get(url)
@@ -119,3 +150,8 @@ class Atilim_Moodle:
             print('\nDone!')
         else:
             self.taken_courses(check=True)
+
+
+if __name__ == '__main__':
+    moodle = Atilim_Moodle()
+    moodle.save_ann_messages()
