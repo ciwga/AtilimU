@@ -67,10 +67,11 @@ class atilim_kimlik:
         saml2 = f'{profile}/saml2/acs'
         login = self.login()
         _getSaml2 = login.get(profile)
-        _saml2Value = _getSaml2.text[1079:19727]
+        soup_2 = BeautifulSoup(_getSaml2.content, 'html.parser')
+        samlr = soup_2.find('input', attrs={'name': 'SAMLResponse'})['value']
 
         payload = {
-            'SAMLResponse': _saml2Value
+            'SAMLResponse': samlr
         }
         login.post(saml2, data=payload)
         my_profile_uri = f'{profile}/profilim'
@@ -78,12 +79,15 @@ class atilim_kimlik:
 
         soup = BeautifulSoup(my_profile.content, 'html.parser')
         dom = etree.HTML(str(soup))
-        s = dom.xpath('//*[@id="kt_post"]/div[1]/div/div/div[2]/div/div/div[2]/span/text()')[3]
+        s = dom.xpath('//*[@id="kt_post"]/div[1]/div/div/div[2]\
+            /div/div/div[2]/span/text()')[3]
         status = str(s).strip()
-        d = dom.xpath('//*[@id="kt_post"]/div[1]/div/div/div[2]/div/div/div[3]/span/text()')[1]
+        d = dom.xpath('//*[@id="kt_post"]/div[1]/div/div/div[2]/\
+            div/div/div[3]/span/text()')[1]
         department = str(d).strip()
 
-        spans = soup.find_all('span', attrs={'class': 'fw-bolder fs-6 text-gray-800'})
+        spans = soup.find_all('span',
+                              attrs={'class': 'fw-bolder fs-6 text-gray-800'})
         values = [value.text for value in spans]
         del values[0]
         return values, status, department
@@ -91,7 +95,8 @@ class atilim_kimlik:
     def save_profile_atilim(self) -> None:
         values = self.profile_atilim()
         items, status, department = values
-        name, surname, student_email, student_number, phone_number, personal_email = items
+        (name, surname, student_email, student_number,
+            phone_number, personal_email) = items
 
         person = {
             'status': status,
