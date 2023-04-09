@@ -1,9 +1,10 @@
 from bs4 import BeautifulSoup
-from lxml import etree
+from datetime import datetime
 import configparser
 import requests
 import json
 import os
+import pickle
 
 
 class LoginError(Exception):
@@ -11,7 +12,7 @@ class LoginError(Exception):
         super().__init__(message)
 
 
-class atilim_kimlik:
+class Atilim_Kimlik:
 
     user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'\
                  'AppleWebKit/537.36 (KHTML, like Gecko)'\
@@ -41,13 +42,12 @@ class atilim_kimlik:
                 config.write(conf)
             print('Username and password are saved in atilim_config.ini!')
 
-    def login(self, uri=kimlik_uri,
-              ref=referer, ua=user_agent) -> requests.Session:
+    def get_session(self) -> requests.Session:
 
         header = {
             "Connection": "keep-alive",
-            "Referer": ref,
-            "User-Agent": ua
+            "Referer": self.referer,
+            "User-Agent": self.user_agent
         }
 
         payload = {
@@ -57,11 +57,31 @@ class atilim_kimlik:
 
         with requests.Session() as session:
             session.headers.update(header)
-            post = session.post(uri, json=payload)
+            post = session.post(self.kimlik_uri, json=payload)
             if json.loads(post.content)['success'] is False:
                 raise LoginError('Invalid username or password')
             else:
+                with open('atilim-session', 'wb') as s:
+                    pickle.dump(session, s)
                 return session
+
+    def login(self):
+        if os.path.exists('atilim-session'):
+            m_time = os.stat('atilim-session').st_mtime
+            mtime = datetime.fromtimestamp(m_time)
+            now = datetime.now()
+            minute = now.minute - mtime.minute
+            if minute > 20:
+                os.remove('atilim-session')
+                return self.get_session()
+            else:
+                with requests.Session() as session:
+                    with open('atilim-session', 'rb') as s:
+                        cookie = pickle.load(s)
+                        session.cookies.update(cookie.cookies)
+                    return session
+        else:
+            return self.get_session()
 
     def profile_atilim(self, profile=profile_uri) -> tuple:
         saml2 = f'{profile}/saml2/acs'
@@ -78,12 +98,15 @@ class atilim_kimlik:
         my_profile = login.get(my_profile_uri)
 
         soup = BeautifulSoup(my_profile.content, 'html.parser')
-        dom = etree.HTML(str(soup))
-        s = dom.xpath('//*[@id="kt_post"]/div[1]/div/div/div[2]\
-            /div/div/div[2]/span/text()')[3]
+        # '//*[@id="kt_post"]/div[1]/div/div/div[2]\
+        #  /div/div/div[2]/span/text()')[3]
+        s = soup.select('#kt_post > div:nth-child(1) > div > div >\
+         div:nth-child(2) > div > div > div:nth-child(2) > span')[0].text
         status = str(s).strip()
-        d = dom.xpath('//*[@id="kt_post"]/div[1]/div/div/div[2]/\
-            div/div/div[3]/span/text()')[1]
+        # '//*[@id="kt_post"]/div[1]/div/div/div[2]/\
+        #  div/div/div[3]/span/text()')[1]
+        d = soup.select('#kt_post > div:nth-child(1) > div > div >\
+         div:nth-child(2) > div > div > div:nth-child(3) > span')[0].text
         department = str(d).strip()
 
         spans = soup.find_all('span',
@@ -114,5 +137,5 @@ class atilim_kimlik:
 
 
 if __name__ == '__main__':
-    atilim = atilim_kimlik()
+    atilim = Atilim_Kimlik()
     atilim.save_profile_atilim()
