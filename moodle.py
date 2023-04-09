@@ -1,4 +1,4 @@
-from atilim_profile import atilim_kimlik
+from atilim_profile import Atilim_Kimlik
 from datetime import datetime
 from bs4 import BeautifulSoup
 import json
@@ -9,12 +9,12 @@ class Atilim_Moodle:
 
     def __init__(self):
         self.userid_container = []
-        self.uri = f'https://moodle.{atilim_kimlik.domain}'
+        self.uri = f'https://moodle.{Atilim_Kimlik.domain}'
 
     def auth_moodle(self):
         loginP = f'{self.uri}/auth/saml2/sp/saml2-acs.php/moodle.atilim.edu.tr'
-        resume = f'{atilim_kimlik.referer}/saml2/sso'
-        session = atilim_kimlik().login()
+        resume = f'{Atilim_Kimlik.referer}/saml2/sso'
+        session = Atilim_Kimlik().login()
 
         local_time = datetime.now()
         timestamp = datetime.timestamp(local_time) * 1000
@@ -103,8 +103,8 @@ class Atilim_Moodle:
         return selected_link, shortname
 
     def save_ann_messages(self, save_all=False):
-        ''' Save all course announcements
-            that you enrolled in'''
+        ''' Save all course announcements that you enrolled in with
+            :save_all=True'''
         session, sesskey = self.auth_moodle()
 
         jsonfile = f'{self.userid_container[0]}_courses.json'
