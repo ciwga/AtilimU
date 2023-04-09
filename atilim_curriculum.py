@@ -1,4 +1,4 @@
-from atilim_profile import atilim_kimlik
+from atilim_profile import Atilim_Kimlik
 from bs4 import BeautifulSoup
 import requests
 import json
@@ -9,28 +9,31 @@ class Curriculum:
 
     head = {
         'Connection': 'keep-alive',
-        'user-agent': atilim_kimlik.user_agent,
+        'user-agent': Atilim_Kimlik.user_agent,
         'referer': 'https://www.atilim.edu.tr'
     }
 
     def __init__(self, curriculum_web_uri: str, header=head):
         self.web_uri = curriculum_web_uri
-        assert 'mufredat' in self.web_uri.split('/'), '(Wrong Page) The webpage url is not the curriculum page.'
+        assert 'mufredat' in self.web_uri.split('/'),\
+            '(Wrong Page) The webpage url is not the curriculum page.'
         r = requests.get(self.web_uri, headers=header)
         self.soup = BeautifulSoup(r.content, 'html.parser')
 
-    def save_curriculum(self, id: list, department_id: list, 
+    def save_curriculum(self, id: list, department_id: list,
                         name: list, code: list, precondition: list,
                         isElective: list, isAreaElective: list,
                         isSelective: list):
         try:
-            with open('curriculum_lessons_data.csv', 'r', encoding='utf-8') as csf:
+            with open('curriculum_lessons_data.csv', 'r', encoding='utf-8')\
+                 as csf:
                 reader = csv.reader(csf, delimiter=',')
                 column_name = [column[0] for column in reader]
         except FileNotFoundError:
             column_name = list()
 
-        with open('curriculum_lessons_data.csv', 'a', newline='', encoding='utf-8') as csvfile:
+        with open('curriculum_lessons_data.csv', 'a',
+                  newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
             if 'lesson_id' not in column_name:
                 writer.writerow(['lesson_id', 'department_id',
