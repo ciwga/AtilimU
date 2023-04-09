@@ -1,4 +1,4 @@
-from atilim_profile import atilim_kimlik
+from atilim_profile import Atilim_Kimlik
 from atilim_curriculum import Curriculum
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -8,12 +8,12 @@ import os
 
 class Atacs_Student:
 
-    atacs_uri = f'https://atacs.{atilim_kimlik.domain}'
+    atacs_uri = f'https://atacs.{Atilim_Kimlik.domain}'
 
-    def auth(self, uri=atacs_uri) -> atilim_kimlik.login:
-        auth_uri = f'{uri}/Auth/AssertionConsumerService'
-        session = atilim_kimlik().login()
-        saml = session.get(uri)
+    def auth(self) -> Atilim_Kimlik.login:
+        auth_uri = f'{self.atacs_uri}/Auth/AssertionConsumerService'
+        session = Atilim_Kimlik().login()
+        saml = session.get(self.atacs_uri)
 
         soup = BeautifulSoup(saml.content, 'html.parser')
         samlR = soup.find('input', attrs={'name': 'SAMLResponse'})['value']
@@ -27,8 +27,8 @@ class Atacs_Student:
 
         return session
 
-    def report_open_courses(self, uri=atacs_uri) -> None:
-        opc_uri = f'{uri}/DersAcmaReport'
+    def report_open_courses(self) -> None:
+        opc_uri = f'{self.atacs_uri}/DersAcmaReport'
         session = self.auth()
 
         session.headers.update({
@@ -66,6 +66,7 @@ class Atacs_Student:
         print('Fetched all the lessons!')
 
     def opened_lessons_database(self, curriculum_uri=None) -> None:
+        '''Create a lesson database to manipulate it'''
         def compare_courses():
             df = pd.read_csv('all_opened_courses.csv')
             try:
@@ -144,6 +145,7 @@ class Atacs_Student:
             compare_courses()
 
     def is_lesson_opened(self, *code: str) -> None:
+        ''' You can check the course with its shortcode whether opened '''
         if not os.path.isfile('opened_curriculum_courses.json'):
             self.opened_lessons_database()
         with open('opened_curriculum_courses.json', 'r', encoding='utf-8')\
@@ -163,11 +165,11 @@ class Atacs_Student:
                 print(f'The lesson {store} is not opened!')
         check(code)
 
-    def received_messages(self, uri=atacs_uri) -> tuple:
-        m_uri = f'{uri}/OgrenciMesaj/Ogrenci_Gelenkutusu'
+    def received_messages(self) -> tuple:
+        m_uri = f'{self.atacs_uri}/OgrenciMesaj/Ogrenci_Gelenkutusu'
         session = self.auth()
         session.headers.update({
-            'Referer': uri
+            'Referer': self.atacs_uri
         })
         page = session.get(m_uri)
         soup = BeautifulSoup(page.content, 'html.parser')
@@ -187,7 +189,8 @@ class Atacs_Student:
         df['id'] = pd.Series(message_codes)
         return df, session
 
-    def save_all_messages(self, uri=atacs_uri) -> None:
+    def save_all_messages(self) -> None:
+        ''' You can save all the atacs messages in html format'''
         df, session = self.received_messages()
 
         payload = {
@@ -196,7 +199,7 @@ class Atacs_Student:
 
         with open('my_atacs_messages.html', 'a+', encoding='utf-8') as fh:
             for ix in range(len(df['id'])):
-                m = f"{uri}/OgrenciMesaj/Ogrenci_MesajGoruntule/{df['id'][ix]}"
+                m = f"{self.atacs_uri}/OgrenciMesaj/Ogrenci_MesajGoruntule/{df['id'][ix]}"
                 h = session.get(m, data=payload)
                 soup = BeautifulSoup(h.content, 'html.parser')
 
@@ -212,11 +215,13 @@ class Atacs_Student:
                     fh.write(f'<b>Message:</b> {message.strip()}\n')
                     fh.write(f"<p><b>{'*'*200}</b></p>\n")
 
-    def get_financial_pay_table(self, uri=atacs_uri) -> None:
-        pay_uri = f'{uri}/OgrenciFinans/Ogr_Bilgi_getir'
+    def get_financial_pay_table(self) -> None:
+        ''' You can access and save your school financial table 
+            output file format will be csv'''
+        pay_uri = f'{self.atacs_uri}/OgrenciFinans/Ogr_Bilgi_getir'
         session = self.auth()
         session.headers.update({
-            'Referer': f'{uri}//OgrenciFinans'
+            'Referer': f'{self.atacs_uri}//OgrenciFinans'
         })
         payload = {
             'ogr_no': ''
@@ -237,8 +242,10 @@ class Atacs_Student:
         total = collection[collection.columns[-1]].sum()
         print(f'Paid total money: {total}\u20ba')
 
-    def save_kvkk_form(self, uri=atacs_uri) -> None:
-        kvkk_uri = f'{uri}/Kvkk/ReviewForm'
+    def save_kvkk_form(self) -> None:
+        ''' If you wonder what you select on the form, you can save
+            all your choices in html format'''
+        kvkk_uri = f'{self.atacs_uri}/Kvkk/ReviewForm'
         session = self.auth()
         form = session.get(kvkk_uri)
         soup = BeautifulSoup(form.content, 'html.parser')
@@ -246,8 +253,9 @@ class Atacs_Student:
         with open('atilim_kvkk_form.html', 'w', encoding='utf-8') as kvkk:
             kvkk.write(str(texts))
 
-    def save_term_notes(self, student_number: str, uri=atacs_uri) -> None:
-        notGorme = f'{uri}/NotGorme'
+    def save_term_notes(self, student_number: str) -> None:
+        ''' You can save your term notes in html format'''
+        notGorme = f'{self.atacs_uri}/NotGorme'
         session = self.auth()
         termPage = session.get(notGorme)
         soup = BeautifulSoup(termPage.content, 'html.parser')
@@ -287,3 +295,7 @@ class Atacs_Student:
             f.write(f"<p style='margin-bottom:0;'>\
                 <b>{'*'*85}</b></p>")
             f.write(str(table2))
+
+if __name__ == '__main__':
+    atacs = Atacs_Student()
+    atacs.save_all_messages()
