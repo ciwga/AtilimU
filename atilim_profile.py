@@ -1,5 +1,5 @@
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 import configparser
 import requests
 import json
@@ -70,9 +70,9 @@ class Atilim_Kimlik:
             m_time = os.stat('atilim-session').st_mtime
             mtime = datetime.fromtimestamp(m_time)
             now = datetime.now()
-            minute = now.minute - mtime.minute
-            if minute > 20:
-                os.remove('atilim-session')
+            elapsed = now - mtime
+            if elapsed > timedelta(minutes=20):
+                '''Maximum timeout limit is 120 minutes'''
                 return self.get_session()
             else:
                 with requests.Session() as session:
@@ -83,10 +83,10 @@ class Atilim_Kimlik:
         else:
             return self.get_session()
 
-    def profile_atilim(self, profile=profile_uri) -> tuple:
-        saml2 = f'{profile}/saml2/acs'
+    def profile_atilim(self) -> tuple:
+        saml2 = f'{self.profile_uri}/saml2/acs'
         login = self.login()
-        _getSaml2 = login.get(profile)
+        _getSaml2 = login.get(self.profile_uri)
         soup_2 = BeautifulSoup(_getSaml2.content, 'html.parser')
         samlr = soup_2.find('input', attrs={'name': 'SAMLResponse'})['value']
 
@@ -94,7 +94,7 @@ class Atilim_Kimlik:
             'SAMLResponse': samlr
         }
         login.post(saml2, data=payload)
-        my_profile_uri = f'{profile}/profilim'
+        my_profile_uri = f'{self.profile_uri}/profilim'
         my_profile = login.get(my_profile_uri)
 
         soup = BeautifulSoup(my_profile.content, 'html.parser')
