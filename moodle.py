@@ -3,6 +3,7 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 import json
 import os
+import re
 
 
 class Atilim_Moodle:
@@ -125,26 +126,29 @@ class Atilim_Moodle:
                     page = session.get(url)
                     s = BeautifulSoup(page.content, 'html.parser')
                     try:
-                        an = s.find('div', attrs={'class': 'activityinstance'})
-                        ann_h = an.a['href']
-                        if 'forum' in ann_h:
-                            messages = session.get(ann_h)
-                            s2 = BeautifulSoup(messages.content, 'html.parser')
-                            forum = s2.find_all('a',
+                        an = s.find_all('a', attrs={'class': 'aalink'})
+                        raw = r'https://moodle.atilim.edu.tr/mod/forum/view.php\?id='
+                        for i in an:
+                            regx = re.search(f'{raw}(\d+)', str(i))
+                            if regx:
+                                ann_h = regx.group(0)
+                                messages = session.get(ann_h)
+                                s2 = BeautifulSoup(messages.content, 'html.parser')
+                                forum = s2.find_all('a',
+                                                    attrs={'class':
+                                                           'w-100 h-100 d-block'})
+                                anns = (x['href'] for x in forum)
+                                for ann in anns:
+                                    msg = session.get(ann)
+                                    s3 = BeautifulSoup(msg.content, 'html.parser')
+                                    d = s3.find('div',
                                                 attrs={'class':
-                                                       'w-100 h-100 d-block'})
-                            anns = (x['href'] for x in forum)
-                            for ann in anns:
-                                msg = session.get(ann)
-                                s3 = BeautifulSoup(msg.content, 'html.parser')
-                                d = s3.find('div',
-                                            attrs={'class':
-                                                   'd-flex flex-column w-100'})
-                                af.write(str(d))
-                                af.write('*'*85)
-                                print(f'\r{count+1} announcement is saved',
-                                      end='', flush=True)
-                                count += 1
+                                                       'd-flex flex-column w-100'})
+                                    af.write(str(d))
+                                    af.write('*'*85)
+                                    print(f'\r{count+1} announcement is saved',
+                                          end='', flush=True)
+                                    count += 1
                     except AttributeError:
                         pass
             print('\nDone!')
