@@ -106,12 +106,14 @@ class Atacs_Student:
 
                     if dep_name in quota:
                         import re
-
-                        kota = re.search(
-                            f"(?<={dep_name} \(Lisans\) \(İngilizce\) :).+[0-9] / [0-9]*",
-                            quota,
-                        ).group(0)
-                        kota = kota.split()[2]
+                        try:
+                            kota = re.search(
+                                f"(?<={dep_name} \(Lisans\) \(İngilizce\) :).+[0-9] / [0-9]*",
+                                quota,
+                            ).group(0)
+                            kota = kota.split()[2]
+                        except:
+                            pass
                         print(course, cname, "0/" + kota, section, teacher)
                     else:
                         print(
