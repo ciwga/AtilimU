@@ -1,5 +1,5 @@
-from atilim_kimlik import AtilimAuth
-from atilim_curriculum import Curriculum
+from tools.atilim_kimlik import AtilimAuth
+from tools.atilim_curriculum import Curriculum
 from pathlib import Path
 from bs4 import BeautifulSoup
 from tqdm import tqdm
@@ -15,6 +15,10 @@ class UniversityAcademicSystem:
     main_uri: str = "https://unacs.atilim.edu.tr"
     api: str = "https://unacs-api.atilim.edu.tr/api"
     token: str = ""
+    path = Path(__file__).parent.parent
+
+    def __init__(self):
+        Path(f"{self.path}/atilim_data/unacs").mkdir(parents=True, exist_ok=True)
 
     def login(self):
         unacs_login_uri = f"{self.api}/Identity/Auth/Login?returnUrl={self.api}/Identity/Auth/AssertionConsumerService"
@@ -44,8 +48,8 @@ class UniversityAcademicSystem:
         return session
 
     def get_opened_area_elective_courses(self):
-        Path("atilim_data").mkdir(parents=True, exist_ok=True)
-        curriculum_file_path = Path("atilim_data/curriculum_lessons_data.csv")
+        Path(f"{self.path}/atilim_data").mkdir(parents=True, exist_ok=True)
+        curriculum_file_path = Path(f"{self.path}/atilim_data/curriculum_lessons_data.csv")
         if not curriculum_file_path.exists():
             webpage = input("Enter Curriculum Webpage URL: ")
             Curriculum(webpage).run_all()
@@ -60,7 +64,9 @@ class UniversityAcademicSystem:
         course_uri = f"{self.api}/AcilanDerslerRaporu/GetAcilanDerslerReport"
         term_uri = f"{self.api}/Common/Get2016AfterDonemList"
         current_term = session.get(term_uri).json()["responseData"][0]["id"]
-        temp_file_name = Path(f"atilim_data/temp_{current_term}_opened_courses.json")
+        temp_file_name = Path(f"{self.path}/atilim_data/unacs/temp_{current_term}_opened_courses.json")
+        if temp_file_name.exists():
+            temp_file_name.unlink(missing_ok=True)
 
         with (tqdm(total=len(area_elective_courses_ids),
                    desc=f"Fetching Courses") as pbar):
@@ -86,8 +92,8 @@ class UniversityAcademicSystem:
                 time.sleep(wait_time)
                 pbar.update()
 
-        area_elective_csv_file = Path("atilim_data/area_elective_opened_courses.csv")
-        textfile_name = Path(f"atilim_data/area_elective_courses{current_term}.txt")
+        area_elective_csv_file = Path(f"{self.path}/atilim_data/unacs/area_elective_opened_courses.csv")
+        textfile_name = Path(f"{self.path}/atilim_data/unacs/area_elective_courses{current_term}.txt")
 
         if area_elective_csv_file.exists():
             Path(area_elective_csv_file).unlink()

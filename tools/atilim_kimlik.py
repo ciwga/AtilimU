@@ -4,7 +4,7 @@ import pickle
 import requests
 from datetime import datetime, timedelta
 from pathlib import Path
-from exceptions import LoginError, IPBanned
+from tools.exceptions import LoginError, IPBanned
 
 
 class AtilimAuth:
@@ -14,11 +14,12 @@ class AtilimAuth:
     user_agent: str = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.207.132.170 "
                        "Safari/537.36")
-    session_file: Path = Path("atilim-session")
+    path = Path(__file__).parent.parent
+    session_file: Path = Path(f"{path}/atilim_data/atilim-session")
 
     def __init__(self):
         self.config: configparser.ConfigParser = configparser.ConfigParser()
-        self.config_file: str = "auth_atilim.ini"
+        self.config_file: str = f"{self.path}/atilim_data/auth_atilim.ini"
 
         try:
             if Path(self.config_file).exists():
@@ -31,8 +32,8 @@ class AtilimAuth:
             print(f"Error reading configuration file: {e}")
 
     def create_config_file(self) -> tuple:
-        username: str = str(input("Enter your username: "))
-        password: str = str(input("Enter your password: "))
+        username: str = str(input("Enter your Atilim University username: "))
+        password: str = str(input("Enter your Atilim University password: "))
         with open(self.config_file, "w") as configfile:
             self.config["auth"] = {
                 "username": username,

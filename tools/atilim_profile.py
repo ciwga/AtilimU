@@ -1,6 +1,6 @@
 import json
 from bs4 import BeautifulSoup
-from atilim_kimlik import AtilimAuth
+from tools.atilim_kimlik import AtilimAuth
 from pathlib import Path
 
 profile_url: str = f"https://profil.{AtilimAuth.domain}"
@@ -9,9 +9,10 @@ saml2_url: str = f"{profile_url}/saml2/acs"
 
 
 class AtilimProfile:
+    path = Path(__file__).parent.parent
 
     def __init__(self):
-        Path("atilim_data").mkdir(parents=True, exist_ok=True)
+        Path(f"{self.path}/atilim_data").mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def login2profile():
@@ -44,8 +45,7 @@ class AtilimProfile:
 
         return info_values, status, department
 
-    @staticmethod
-    def save_profile_data():
+    def save_profile_data(self):
 
         variables = AtilimProfile.get_profile_data()
         info_values, status, department = variables
@@ -69,11 +69,11 @@ class AtilimProfile:
             "personal_phone": phone_number,
             "personal_email": personal_email,
         }
-        profile_file_path = Path(f"atilim_data/{student_number}_profile.json")
+        profile_file_path = Path(f"{self.path}/atilim_data/{student_number}_profile.json")
         with open(profile_file_path, "w", encoding="utf-8") as profile:
             json.dump(obj=profile_data, fp=profile, indent=4, ensure_ascii=False)
             print(f"{student_number}_profile.json created")
 
 
 if __name__ == "__main__":
-    AtilimProfile.save_profile_data()
+    AtilimProfile().save_profile_data()

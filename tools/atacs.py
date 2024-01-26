@@ -1,4 +1,4 @@
-from atilim_kimlik import AtilimAuth
+from tools.atilim_kimlik import AtilimAuth
 from bs4 import BeautifulSoup
 from pathlib import Path
 from tqdm import tqdm
@@ -10,9 +10,10 @@ import time
 
 class Atacs:
     atacs_uri = f"https://atacs.{AtilimAuth.domain}"
+    path = Path(__file__).parent.parent
 
     def __init__(self):
-        Path("atilim_data").mkdir(parents=True, exist_ok=True)
+        Path(f"{self.path}/atilim_data/atacs").mkdir(parents=True, exist_ok=True)
 
     def login(self) -> AtilimAuth.login:
         auth_uri = f"{self.atacs_uri}/Auth/AssertionConsumerService"
@@ -30,7 +31,7 @@ class Atacs:
 
     def save_atacs_messages(self) -> None:
         inbox_uri = f"{self.atacs_uri}/OgrenciMesaj/Ogrenci_Gelenkutusu"
-        message_file_path = Path("atilim_data/atacs_messages.html")
+        message_file_path = Path(f"{self.path}/atilim_data/atacs/atacs_messages.html")
 
         session = self.login()
         session.headers.update({"Referer": self.atacs_uri})
@@ -80,7 +81,7 @@ class Atacs:
 
     def save_financial_pay_table(self) -> None:
         table_uri = f"{self.atacs_uri}/OgrenciFinans/Ogr_Bilgi_getir"
-        pay_file_path = Path("atilim_data/atilim_financial_pay_table.csv")
+        pay_file_path = Path(f"{self.path}/atilim_data/atacs/atilim_financial_pay_table.csv")
 
         session = self.login()
         session.headers.update({"Referer": f"{self.atacs_uri}/OgrenciFinans"})
@@ -111,7 +112,7 @@ class Atacs:
 
     def save_kvkk_form(self) -> None:
         kvkk_uri = f"{self.atacs_uri}/Kvkk/ReviewForm"
-        kvkk_file_path = Path("atilim_data/atilim_kvkk_form.html")
+        kvkk_file_path = Path(f"{self.path}/atilim_data/atacs/atilim_kvkk_form.html")
 
         session = self.login()
 
@@ -121,6 +122,7 @@ class Atacs:
 
         with open(kvkk_file_path, "w", encoding="utf-8") as kvkk:
             kvkk.write(str(content))
+        print("Kvkk form has been saved.")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import csv
 
 
 class Curriculum:
+    path = Path(__file__).parent.parent
 
     def __init__(self, curriculum_web_uri: str):
         self.web_uri = curriculum_web_uri
@@ -37,8 +38,8 @@ class Curriculum:
         is_selective: list,
         curriculum: list,
     ):
-        Path('atilim_data').mkdir(parents=True, exist_ok=True)
-        file_path = Path("atilim_data/curriculum_lessons_data.csv")
+        Path(f'{Curriculum.path}/atilim_data').mkdir(parents=True, exist_ok=True)
+        file_path = Path(f"{Curriculum.path}/atilim_data/curriculum_lessons_data.csv")
         try:
             with open(file_path, "r", encoding="utf-8") as csf:
                 reader = csv.reader(csf, delimiter=",")
