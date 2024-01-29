@@ -68,8 +68,9 @@ class UniversityAcademicSystem:
         if temp_file_name.exists():
             temp_file_name.unlink(missing_ok=True)
 
+        status_bar = tqdm(total=0, bar_format="{desc}", position=1)
         with (tqdm(total=len(area_elective_courses_ids),
-                   desc=f"Fetching Courses") as pbar):
+                   desc=f"Fetching Courses", position=0) as pbar):
             for course_id in area_elective_courses_ids:
                 payload = {
                     "BOLUM_ID": -1,
@@ -87,8 +88,8 @@ class UniversityAcademicSystem:
                             json.dump(course, f, ensure_ascii=False, indent=4)
 
                 wait_time = random.uniform(2.0, 5.5)
-                info = str(f"\tWaiting for {wait_time:.2f} seconds before the next request...")
-                tqdm.write(info, end="")
+                info = f"Waiting for {wait_time:.2f} seconds before the next request..."
+                status_bar.set_description(info)
                 time.sleep(wait_time)
                 pbar.update()
 

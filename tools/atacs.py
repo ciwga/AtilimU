@@ -56,9 +56,9 @@ class Atacs:
         inbox_dataframe["id"] = pd.Series(message_codes)
 
         inbox_payload = {"Tip": "1"}
-
+        time_log = tqdm(total=0, bar_format="{desc}", position=1)
         with open(message_file_path, "a+", encoding="utf-8") as f:
-            for index in tqdm(range(len(inbox_dataframe['id'])), desc="Fetched Msg", total=len(inbox_dataframe['id'])):
+            for index in tqdm(range(len(inbox_dataframe['id'])), desc="Fetched Msg", total=len(inbox_dataframe['id']), position=0):
                 msg_detail_uri = f"{self.atacs_uri}/OgrenciMesaj/Ogrenci_MesajGoruntule/{inbox_dataframe['id'][index]}"
                 msg_detail_page = session.get(msg_detail_uri, data=inbox_payload)
                 msg_detail_soup = BeautifulSoup(msg_detail_page.content, "html.parser")
@@ -76,7 +76,7 @@ class Atacs:
                     f.write(f"<p><b>{'*'*200}</b></p>\n")
 
                 wait_time = random.uniform(1.0, 6.0)
-                tqdm.write(f"\tWaiting for {wait_time:.2f} seconds before the next request...", end='')
+                time_log.set_description_str(f"Waiting for {wait_time:.2f} seconds before the next request...")
                 time.sleep(wait_time)
 
     def save_financial_pay_table(self) -> None:
