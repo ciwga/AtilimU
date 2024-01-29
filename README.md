@@ -7,7 +7,7 @@
 **2. Install the dependencies:**
 
 > [!WARNING]
-> Python3.6+ is required
+> Python3.9+ is required
 
 `pip install -r requirements.txt`
 
@@ -25,7 +25,8 @@ This will print a list of options:
 4. Check the Opened Area Elective Courses
 5. Save Your Financial Pay Table
 6. Save Your KVKK Form
-7. Exit
+7. Download Moodle Main Course Page Documents
+8. Exit
 ```
 
 To choose an option, simply enter the corresponding number. For example, to save your information, enter `1`
@@ -71,16 +72,26 @@ To choose an option, simply enter the corresponding number. For example, to save
 > Saves in `atilim_data/atacs` directory
 >
 
-> [!NOTE]
+> [!NOTE] 
 > **6. Save Your KVKK Form**
 >
 > This option saves your KVKK form to a file.
 >
 > Saves in `atilim_data/atacs` directory
->
+
 
 > [!NOTE]
-> **7. Exit**
+> **7. Download Moodle Main Course Page Documents**
+>
+> This option download course documents in the moodle course main page.
+>
+
+> [!TIP]
+> pdf, xlsx, docx, txt, pptx, zip and html file formats are supported.
+> 
+
+> [!NOTE]
+> **8. Exit**
 >
 > This option exits the application.
 > 
