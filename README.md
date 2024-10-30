@@ -1,97 +1,106 @@
 # ATILIM UNIVERSITY STUDENT SYSTEM
-## INSTALLATION
-**1. Clone the repository from GitHub:**
-   
-`https://github.com/ciwga/AtilimU.git`
 
-**2. Install the dependencies:**
+## Features
 
-> [!WARNING]
-> Python3.9+ is required
+1. Save your personal information.
+2. Save all ATACS messages.
+3. Save announcements from Moodle lessons.
+4. Check opened area elective courses.
+5. Save your financial pay table.
+6. Save your KVKK form.
+7. Download Moodle main course page documents.
+8. Download graduation photos.
 
-`pip install -r requirements.txt`
+## Installation
 
-## HOW TO USE
-To run the application, simply run the following command:
+To use this tool, clone the repository and install the required dependencies:
 
-`python main.py`
-
-This will print a list of options:
-
-```
-1. Save Your Information
-2. Save Your All Atacs Messages
-3. Save Your Announcements of Moodle Lessons
-4. Check the Opened Area Elective Courses
-5. Save Your Financial Pay Table
-6. Save Your KVKK Form
-7. Download Moodle Main Course Page Documents
-8. Exit
+```bash
+git clone https://github.com/ciwga/AtilimU.git
+cd AtilimU
+pip install -r requirements.txt
 ```
 
-To choose an option, simply enter the corresponding number. For example, to save your information, enter `1`
+## Usage
+
+Run the main program using:
+
+```bash
+python main.py
+```
 
 ### Descriptions of Operations
-> [!NOTE]
-> **1. Save Your Information**
->
-> This option saves your personal information, such as your name, surname, student number, and department, to a file.
-> 
-> Saves in `atilim_data` directory
-> 
 
-> [!NOTE]
-> **2. Save Your All Atacs Messages**
->
-> This option saves all of your Atacs messages to a file.
-> 
-> Saves in  `atilim_data/atacs` directory
->
+<details>
+<summary>1. Save your personal information</summary>
 
-> [!NOTE]
-> **3. Save Your Announcements of Moodle Lessons**
->
-> This option saves all of the announcements for your Moodle lessons to a file.
->
-> Saves in `atilim_data/moodle` directory
->
+This option saves your personal information, such as your name, surname, student number, and department, to a file.
+Saves in `atilim_data/university_profile` directory.
 
-> [!NOTE]
-> **4. Check the Opened Area Elective Courses**
->
-> This option checks and saves the opened area elective courses.
->
-> Saves in `atilim_data/unacs` directory
->
+</details>
 
-> [!NOTE]
-> **5. Save Your Financial Pay Table**
->
-> This option saves your financial pay table to a file. The option also prints the total amount of money you have paid to date.
->
-> Saves in `atilim_data/atacs` directory
->
+<details>
+<summary>2. Save all ATACS messages</summary>
 
-> [!NOTE] 
-> **6. Save Your KVKK Form**
->
-> This option saves your KVKK form to a file.
->
-> Saves in `atilim_data/atacs` directory
+This option saves all of your Atacs messages to a file.
+Saves in `atilim_data/atacs` directory.
+
+</details>
+
+<details>
+<summary>3. Save announcements from Moodle lessons</summary>
+
+This option saves all of the announcements for your Moodle lessons to a file.
+Saves in `atilim_data/moodle` directory.
+
+</details>
+
+<details>
+<summary>4. Check opened area elective courses</summary>
+
+This option checks and saves the opened area elective courses.
+Saves in `atilim_data/unacs` directory.
+
+</details>
+
+<details>
+<summary>5. Save your financial pay table</summary>
+
+This option saves your financial pay table to a file. The option also prints the total amount of money you have paid to date.
+Saves in `atilim_data/atacs` directory.
+
+</details>
+
+<details>
+<summary>6. Save your KVKK form</summary>
+
+This option saves your KVKK form to a file.
+Saves in `atilim_data/atacs` directory.
+
+</details>
+
+<details>
+<summary>7. Download Moodle main course page documents</summary>
+
+This option downloads course documents from the Moodle course main page.
+Supported file formats include pdf, xlsx, docx, txt, pptx, zip, and html.
+Saves in `atilim_data/moodle` directory.
+
+</details>
+
+<details>
+<summary>8. Download graduation photos</summary>
+
+This option downloads graduation photos if you have already participated in the ceremony.
+Saves in `atilim_data/unacs/graduation_photos` directory.
+
+</details>
 
 
-> [!NOTE]
-> **7. Download Moodle Main Course Page Documents**
->
-> This option download course documents in the moodle course main page.
->
+## Version History
 
-> [!TIP]
-> pdf, xlsx, docx, txt, pptx, zip and html file formats are supported.
-> 
+### Version 1.8
 
-> [!NOTE]
-> **8. Exit**
->
-> This option exits the application.
-> 
+- Fixed login errors.
+- Added cookie management for improved session handling.
+- Refactored code for a more modular structure.
