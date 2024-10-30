@@ -1,129 +1,123 @@
-from tools.atilim_kimlik import AtilimAuth
-from bs4 import BeautifulSoup
-from pathlib import Path
+import time
+import random
+import pandas as pd
 from tqdm import tqdm
 from io import StringIO
-import pandas as pd
-import random
-import time
+from pathlib import Path
+from bs4 import BeautifulSoup
+from typing import NoReturn, Any
+from tools.config import Config
+from tools.exceptions import SaveError
+from tools.kiyos_auth import AtilimAuth
 
 
 class Atacs:
-    atacs_uri = f"https://atacs.{AtilimAuth.domain}"
-    path = Path(__file__).parent.parent
 
-    def __init__(self):
-        Path(f"{self.path}/atilim_data/atacs").mkdir(parents=True, exist_ok=True)
-
-    def login(self) -> AtilimAuth.login:
-        auth_uri = f"{self.atacs_uri}/Auth/AssertionConsumerService"
+    @staticmethod
+    def login():
         session = AtilimAuth().login()
-
-        saml = session.get(self.atacs_uri)
-        soup = BeautifulSoup(saml.content, "html.parser")
-        saml_response = soup.find("input", attrs={"name": "SAMLResponse"})["value"]
-        relay_state = soup.find("input", attrs={"name": "RelayState"})["value"]
-
-        payload = {"SAMLResponse": saml_response, "RelayState": relay_state}
-        session.post(auth_uri, data=payload)
-
+        AtilimAuth().load_cookies(session, Config.atacs_cookie_keys, 'atacs')
+        session.cookies.set('language', 'tr')
+        saml = session.get(Config.atacs_url)
+        soup = BeautifulSoup(saml.content, 'html.parser')
+        saml_response = soup.find('input', attrs={'name': 'SAMLResponse'})['value']
+        relay_state = soup.find('input', attrs={'name': 'RelayState'})['value']
+        payload = {'SAMLResponse': saml_response, 'RelayState': relay_state}
+        session.post(Config.atacs_auth_url, data=payload)
+        session.get(Config.atacs_student_adress_url)
+        AtilimAuth().save_cookies(session, Config.atacs_cookie_keys, 'atacs')
         return session
 
-    def save_atacs_messages(self) -> None:
-        inbox_uri = f"{self.atacs_uri}/OgrenciMesaj/Ogrenci_Gelenkutusu"
-        message_file_path = Path(f"{self.path}/atilim_data/atacs/atacs_messages.html")
+    @staticmethod
+    def save_atacs_inbox_messages() -> NoReturn:
+        session = Atacs.login()
+        session.headers.update({'Referer': Config.atacs_url})
+        atacs_inbox_webpage = session.get(Config.atacs_inbox_url)
+        soup = BeautifulSoup(atacs_inbox_webpage.content, 'html.parser')
+        message_buttons = soup.find_all('button', attrs={'class': 'btn btn-link'})
+        click_msg_buttons = (button['onclick'].split('/')[-1].replace("'", '') for button in message_buttons)
+        message_codes = [code for code in click_msg_buttons if code.isnumeric()]
 
-        session = self.login()
-        session.headers.update({"Referer": self.atacs_uri})
+        inbox_msg_table = pd.read_html(StringIO(atacs_inbox_webpage.text))
+        inbox_msgs_df = inbox_msg_table[0]
+        for col in ["SİL", "CEVAPLA", "OKU", "DELETE", "REPLY", "READ"]:
+            inbox_msgs_df.drop(columns=col, errors='ignore', inplace=True)
+        inbox_msgs_df.columns = ["name", "surname", "subject", "date", "id"]
+        inbox_msgs_df["id"] = pd.Series(message_codes)
 
-        inbox_page = session.get(inbox_uri)
-        soup = BeautifulSoup(inbox_page.content, "html.parser")
-        buttons = soup.find_all("button", attrs={"class": "btn btn-link"})
-        click_buttons = (button["onclick"].split("/")[-1].replace("'", "") for button in buttons)
-        message_codes = [code for code in click_buttons if code.isnumeric()]
-
-        html_table = pd.read_html(StringIO(inbox_page.text))
-        inbox_dataframe = html_table[0]
         try:
-            del inbox_dataframe["SİL"]
-            del inbox_dataframe["CEVAPLA"]
-        except KeyError:
-            del inbox_dataframe["DELETE"]
-            del inbox_dataframe["REPLY"]
-        del inbox_dataframe[inbox_dataframe.columns[-1]]
+            with open(Config.get_atacs_inbox_messages_filepath(), 'a+', encoding='utf-8') as file:
+                for index in tqdm(range(len(inbox_msgs_df['id'])), desc='Fetched Msg'):
+                    inbox_msg_url = Config.get_atacs_inbox_message_view_link(inbox_msgs_df['id'], index)
+                    inbox_msg_page = session.get(inbox_msg_url, data={'Tip': '1'})
+                    msg_page_soup = BeautifulSoup(inbox_msg_page.content, 'html.parser')
 
-        inbox_dataframe.columns = ["name", "surname", "subject", "date", "id"]
-        inbox_dataframe["id"] = pd.Series(message_codes)
+                    sender = msg_page_soup.find('input', attrs={'id': 'Name'})['value']
+                    subject = msg_page_soup.find('input', attrs={'id': 'Konu'})['value']
+                    message_content = msg_page_soup.find('textarea', attrs={'id': 'Icerik'}).text
+                    file.seek(0)
+                    if message_content.strip() not in file.read():
+                        file.write(f"<p><b>From:</b> {sender}</p>\n")
+                        file.write(f"<p><b>Subject:</b> {subject} </p>\n")
+                        file.write(f"<p><b>Date:</b> {inbox_msgs_df['date'][index]}</p>\n")
+                        file.write(f"<b>Message:</b> {message_content.strip()}\n")
+                        file.write(f"<p><b>{'*' * 200}</b></p>\n")
 
-        inbox_payload = {"Tip": "1"}
-        time_log = tqdm(total=0, bar_format="{desc}", position=1)
-        with open(message_file_path, "a+", encoding="utf-8") as f:
-            for index in tqdm(range(len(inbox_dataframe['id'])), desc="Fetched Msg", total=len(inbox_dataframe['id']), position=0):
-                msg_detail_uri = f"{self.atacs_uri}/OgrenciMesaj/Ogrenci_MesajGoruntule/{inbox_dataframe['id'][index]}"
-                msg_detail_page = session.get(msg_detail_uri, data=inbox_payload)
-                msg_detail_soup = BeautifulSoup(msg_detail_page.content, "html.parser")
+                    wait_time = random.uniform(1.0, 2.8)
+                    info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                    tqdm.write(info)
+                    time.sleep(wait_time)
+        except Exception as e:
+            raise SaveError(f'Failed to save ATACS inbox messages: {e}')
 
-                sender = msg_detail_soup.find("input", attrs={"id": "Name"})["value"]
-                subject = msg_detail_soup.find("input", attrs={"id": "Konu"})["value"]
-                message = msg_detail_soup.find("textarea", attrs={"id": "Icerik"}).text
-
-                f.seek(0)
-                if message.strip() not in f.read():
-                    f.write(f"<p><b>From:</b> {sender}</p>\n")
-                    f.write(f"<p><b>Subject:</b> {subject} </p>\n")
-                    f.write(f"<p><b>Date:</b> {inbox_dataframe['date'][index]}</p>\n")
-                    f.write(f"<b>Message:</b> {message.strip()}\n")
-                    f.write(f"<p><b>{'*'*200}</b></p>\n")
-
-                wait_time = random.uniform(1.0, 6.0)
-                time_log.set_description_str(f"Waiting for {wait_time:.2f} seconds before the next request...")
-                time.sleep(wait_time)
-
-    def save_financial_pay_table(self) -> None:
-        table_uri = f"{self.atacs_uri}/OgrenciFinans/Ogr_Bilgi_getir"
-        pay_file_path = Path(f"{self.path}/atilim_data/atacs/atilim_financial_pay_table.csv")
-
-        session = self.login()
-        session.headers.update({"Referer": f"{self.atacs_uri}/OgrenciFinans"})
-
-        table_payload = {"ogr_no": ""}
-        table_page = session.post(table_uri, data=table_payload)
-        pay_dataframe = pd.read_html(StringIO(table_page.text))[2]
-
-        last_column = pay_dataframe[pay_dataframe.columns[-1]]
-        if last_column.str.contains("\u20ba").any():
-            last_column = last_column.str.replace("\u20ba", "").str.strip().str.replace(",", ".")
-            currency = "\u20ba"
-        else:
-            last_column = last_column.str.replace("\u0024", "").str.strip().str.replace(",", ".")
-            currency = "\u0024"
-        
-        pay_dataframe[pay_dataframe.columns[-1]] = last_column
-        pay_dataframe[pay_dataframe.columns[-1]] = pay_dataframe[pay_dataframe.columns[-1]].astype(float)
-        pay_dataframe.to_csv(pay_file_path, index=False)
-        
+    @staticmethod
+    def save_atacs_financial_pay_table() -> NoReturn:
+        session = Atacs.login()
+        session.headers.update({'Referer': Config.atacs_student_finance_url})
+        financial_table_page = session.post(Config.atacs_financial_table_url, data={'ogr_no': ''})
         try:
-            collection = pay_dataframe[pay_dataframe[pay_dataframe.columns[-3]] == "Tahsilat"]
-        except KeyError:
-            collection = pay_dataframe[pay_dataframe[pay_dataframe.columns[-3]] == "Collection"]
+            financial_frame = pd.read_html(StringIO(financial_table_page.text))[2]
+            financial_frame.rename(columns={financial_frame.columns[-3]: 'Collection'}, inplace=True)
+            financial_frame.to_csv(Config.get_atacs_financial_table_filepath(), index=False)
+        except Exception as e:
+            raise SaveError(f'Failed to save ATACS financial pay table: {e}')
 
-        total_paid_money = collection[collection.columns[-1]].sum()
-        print(f"Total paid money: {total_paid_money} {currency}")
+    @staticmethod
+    def fetch_atacs_financial_information() -> NoReturn:
+        if not Config.get_atacs_financial_table_filepath().exists():
+            Profile.save_atacs_financial_pay_table()
 
-    def save_kvkk_form(self) -> None:
-        kvkk_uri = f"{self.atacs_uri}/Kvkk/ReviewForm"
-        kvkk_file_path = Path(f"{self.path}/atilim_data/atacs/atilim_kvkk_form.html")
+        financial_frame = pd.read_csv(Config.get_atacs_financial_table_filepath())
+        amount_column = financial_frame[financial_frame.columns[-1]]
 
-        session = self.login()
+        currency_map = {
+            '₺': '\u20ba',
+            '€': '\u20ac',
+            '$': '\u0024',
+        }
 
-        form = session.get(kvkk_uri)
-        soup = BeautifulSoup(form.content, "html.parser")
-        content = soup.find("div", attrs={"class": "content"})
+        currency = None
+        for currency_symbol, sign in currency_map.items():
+            if amount_column.str.contains(sign).any():
+                amount_column = amount_column.str.replace(sign, '').str.strip().str.replace(',', '.')
+                currency = currency_symbol
+                break
 
-        with open(kvkk_file_path, "w", encoding="utf-8") as kvkk:
-            kvkk.write(str(content))
-        print("Kvkk form has been saved.")
+        amount_column = amount_column.astype(float)
+        financial_frame[financial_frame.columns[-1]] = amount_column
+        collection = financial_frame['Tutar']
+        total_paid_money = collection.sum()
+        print(f'Total paid money: {total_paid_money} {currency}')
 
-
-if __name__ == "__main__":
-    Atacs().save_atacs_messages()
+    @staticmethod
+    def save_kvkk_form() -> NoReturn:
+        session = Atacs.login()
+        form_webpage = session.get(Config.atacs_kvkk_form_url)
+        soup = BeautifulSoup(form_webpage.content, 'html.parser')
+        form_content = soup.find('div', attrs={'class': 'content'})
+        try:
+            with open(Config.get_atacs_kvkk_form_filepath(), "w", encoding="utf-8") as kvkk_file:
+                kvkk_file.write(str(form_content))
+            print("Kvkk form has been saved.")
+        except Exception as e:
+            raise SaveError(f'Failed to save ATACS KVKK form: {e}')

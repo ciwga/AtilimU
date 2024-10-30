@@ -1,246 +1,231 @@
-from tools.atilim_profile import AtilimAuth
-from datetime import datetime
-from bs4 import BeautifulSoup
-from pathlib import Path
-from tqdm import tqdm
-import json
 import os
 import re
-import random
 import time
+import json
+import random
+from tqdm import tqdm
+from pathlib import Path
+from bs4 import BeautifulSoup
+from datetime import datetime
+from tools.config import Config
+from tools.kiyos_auth import AtilimAuth
+from typing import Tuple, NoReturn, Any
+from tools.helpers import clean_filename, clean_terminal, user_interactions
 
 
-class AtilimMoodle:
-    path = Path(__file__).parent.parent
+class Moodle:
+    userid_container = []
+    file_dict = {}
 
-    def __init__(self):
-        self.userid_container = []
-        self.uri = f"https://moodle.{AtilimAuth.domain}"
-        Path(f"{self.path}/atilim_data/moodle").mkdir(parents=True, exist_ok=True)
-
-    def auth_moodle(self):
-        login_page = f"{self.uri}/auth/saml2/sp/saml2-acs.php/moodle.atilim.edu.tr"
-        resume = f"{AtilimAuth.referer}/saml2/sso"
+    @staticmethod
+    def login():
         session = AtilimAuth().login()
+        is_loaded = AtilimAuth().load_cookies(session, Config.moodle_cookie_keys, 'moodle')
+
+        if is_loaded:
+            return Moodle._process_login(session, loaded=True)
 
         local_time = datetime.now()
         timestamp = datetime.timestamp(local_time) * 1000
-
         payload = {
-            "spentityid": f"{self.uri}/auth/saml2/sp/metadata.php",
-            "RelayState": f"{self.uri}/login/index.php",
-            "cookieTime": timestamp,
+            'spentityid': Config.moodle_metadata_url,
+            'RelayState': Config.moodle_login_url,
+            'cookieTime': timestamp
         }
+        saml_submit_btn = session.post(Config.moodle_sso_url, data=payload)
+        soup = BeautifulSoup(saml_submit_btn.content, 'html.parser')
+        saml_value = soup.find('input', attrs={'name': 'SAMLResponse'})['value']
+        relay_state_value = soup.find('input', attrs={'name': 'RelayState'})['value']
+        assertion_payload = {'SAMLResponse': saml_value, 'RelayState': relay_state_value}
+        moodle_page = session.post(Config.moodle_auth_page_url, data=assertion_payload)
 
-        submit = session.post(resume, data=payload)
-        soup = BeautifulSoup(submit.content, "html.parser")
-        saml_r = soup.find("input", attrs={"name": "SAMLResponse"})["value"]
-        relay_s = soup.find("input", attrs={"name": "RelayState"})["value"]
+        return Moodle._process_login(session, moodle_page)
 
-        pay_login = {"SAMLResponse": saml_r, "RelayState": relay_s}
+    @staticmethod
+    def _process_login(session, moodle_page=None, loaded=None) -> Tuple:
+        if moodle_page is None:
+            moodle_page = session.get(Config.moodle_url)
 
-        main_p = session.post(login_page, data=pay_login)
-        soup2 = BeautifulSoup(main_p.content, "html.parser")
-        href = soup2.find("a", attrs={"data-title": "logout,moodle"})["href"]
-        sesskey = href.split("=")[1]
+        moodle_page_tree = BeautifulSoup(moodle_page.content, 'html.parser')
+        target_sesskey_url = moodle_page_tree.find('a', attrs={'data-title': 'logout,moodle'})['href']
+        sesskey = str(target_sesskey_url.split('=')[1])
+        login_info = moodle_page_tree.find('div', attrs={'class': 'logininfo'}).a
+        userid = login_info['href'].split('=')[1]
+        Moodle.userid_container.append(userid)
 
-        div = soup2.find("div", attrs={"class": "logininfo"}).a
-        userid = div["href"].split("=")[1]
-        self.userid_container.append(userid)
+        if not loaded:
+            AtilimAuth().save_cookies(session, Config.moodle_cookie_keys, 'moodle')
 
         return session, sesskey
 
-    def download_files_from_course_page(self, course_page_url: str = None):
-        if course_page_url is None:
-            course_page_url = input("Enter the Course Main Page URL: ")
+    def organize_files(self, file_ext: str, filename: str, file_url: str) -> NoReturn:
+        if file_ext in self.file_dict:
+            self.file_dict[file_ext].append({
+                'filename': filename,
+                'file_url': file_url
+            })
+        else:
+            self.file_dict[file_ext] = [{
+                'filename': filename,
+                'file_url': file_url
+            }]
 
-        session, temp = self.auth_moodle()
-        course_page_context = session.get(course_page_url)
-        soup = BeautifulSoup(course_page_context.content, "html.parser")
+    def download_moodle_course_files(self) -> NoReturn:
+        self.file_dict.clear()
+        course_url = str(input('Enter the moodle course url: '))
+        course_name = str(course_url.split('=')[-1])
 
-        file_dict = {}
+        session, _ = self.login()
+        course_webpage = session.get(course_url)
+        if course_webpage.status_code != 200:
+            raise ConnectionError(f'Failed connection to {course_url}\nStatus {course_webpage.status_code} code')
 
-        def dict_organizer(file_ext: str, name_value: str, url_value: str):
-            if file_ext in file_dict:
-                file_dict[file_ext].append({
-                    'file_name': name_value,
-                    'file_url': url_value
-                })
-            else:
-                file_dict[file_ext] = [{
-                    'file_name': name_value,
-                    'file_url': url_value
-                }]
+        course_webpage_tree = BeautifulSoup(course_webpage.content, 'html.parser')
+        activity_elements = course_webpage_tree.find_all('div', attrs={'class': 'activityinstance'})
+        for element in activity_elements:
+            img_tag = element.find('img')
+            try:
+                img_tag_name = element.find('span', attrs={'class': 'instancename'})
+                filename = img_tag_name.text.strip()
+                filetypes = {
+                    'pdf': 'pdf',
+                    'spreadsheet': 'xlsx',
+                    'document': 'docx',
+                    'powerpoint': 'pptx',
+                    'text': 'txt',
+                    'archive': 'zip',
+                    'html': 'html'
+                }
+                file_url = element.find('a')['href']
+                filetype_icon_url = img_tag['src']
+                for key, extension in filetypes.items():
+                    if key in filetype_icon_url:
+                        self.organize_files(extension, filename, file_url)
+                        break
+            except Exception as e:
+                tqdm.write(f"Error processing element: {e}")
 
-        activity_list = soup.find_all("div", attrs={"class": "activityinstance"})
-        for instance in activity_list:
-
-            img_tag = instance.find("img")
-            span_tag = instance.find("span", attrs={"class": "instancename"})
-            file_name = span_tag.text.strip()
-            if img_tag is not None:
-
-                file_url = instance.find("a")["href"]
-                file_icon_url = img_tag["src"]
-                if 'pdf' in file_icon_url:
-                    dict_organizer('pdf', file_name, file_url)
-                if 'spreadsheet' in file_icon_url:
-                    dict_organizer('xlsx', file_name, file_url)
-                if 'document' in file_icon_url:
-                    dict_organizer('docx', file_name, file_url)
-                if 'powerpoint' in file_icon_url:
-                    dict_organizer('pptx', file_name, file_url)
-                if 'text' in file_icon_url:
-                    dict_organizer('txt', file_name, file_url)
-                if 'archive' in file_icon_url:
-                    dict_organizer('zip', file_name, file_url)
-                if 'html' in file_icon_url:
-                    dict_organizer('html', file_name, file_url)
-
-        path_dir_name = course_page_url.split("=")[-1]
-        dir_path = Path(f"{self.path}/atilim_data/moodle/Course_Documents/{path_dir_name}")
-        dir_path.mkdir(parents=True, exist_ok=True)
-
-        time_status = tqdm(total=0, bar_format="{desc}", position=1)
-        for key, value in file_dict.items():
-            for index, _ in tqdm(enumerate(value), desc=f"Downloading {key} files", position=0, unit="file", total=len(value)):
-                file_path = Path(f"{dir_path}/{value[index]['file_name']}.{key}")
-                request_url = session.get(value[index]['file_url'])
-                if request_url.status_code == 200:
-                    with open(file_path, 'wb') as f:
-                        f.write(request_url.content)
+        course_folder = Config.get_moodle_documents_folderpath(course_name)
+        for extension, file in self.file_dict.items():
+            for index, _ in tqdm(enumerate(file),
+                                 desc=f'{extension.capitalize()} files downloading', unit='file', total=len(extension)):
+                cleaned_filename = clean_filename(f'{file[index]['filename']}.{extension}')
+                filepath = course_folder / cleaned_filename
+                file_request = session.get(file[index]['file_url'])
+                if file_request.status_code == 200:
+                    with filepath.open(mode='wb') as f:
+                        f.write(file_request.content)
                 else:
-                    tqdm.write(f"Error: {request_url.status_code}")
+                    tqdm.write(f'Download Failed: {filepath.name} with status {file_request.status_code}')
 
-                wait_time = random.uniform(1.0, 3.1)
-                info = f"Waiting for {wait_time:.2f} seconds before the next request..."
-                time_status.set_description_str(info)
+                wait_time = random.uniform(1.0, 2.5)
+                info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                tqdm.write(info)
                 time.sleep(wait_time)
 
-    def taken_courses(self, user_id=None, check=False):
-        service = f"{self.uri}/lib/ajax/service.php"
-        session, sesskey = self.auth_moodle()
-
-        userid = user_id if user_id is not None else self.userid_container[0]
-
+    def moodle_taken_courses(self, session, sesskey) -> NoReturn:
         params = {
-            "sesskey": sesskey,
-            "info": "core_course_get_recent_courses",
+            'sesskey': sesskey,
+            'info': 'core_course_get_recent_courses',
         }
 
         payload = [
             {
-                "index": "0",
-                "methodname": "core_course_get_recent_courses",
-                "args": {"userid": userid},
+                'index': '0',
+                'methodname': 'core_course_get_recent_courses',
+                'args': {'userid': self.userid_container[0]},
             }
         ]
 
-        my_courses = session.post(service, params=params, json=payload)
+        my_courses = session.post(Config.moodle_taken_courses_page_url, params=params, json=payload)
         jsonobject = json.loads(my_courses.content)
-        courses_json_file_path = Path(f"{self.path}/atilim_data/moodle/{userid}_courses.json")
-        with open(courses_json_file_path, "w", encoding="utf-8") as f:
-            f.write(json.dumps(jsonobject, indent=4, ensure_ascii=False))
-        print("Fetched your taken courses database!")
-        if check:
-            self.save_ann_messages()
+        with Config.get_moodle_taken_courses_filepath(self.userid_container[0]).open(mode='w',
+                                                                                     encoding='utf-8') as jsonfile:
+            jsonfile.write(json.dumps(jsonobject, indent=4, ensure_ascii=False))
+        print('Fetched your taken moodle courses database!')
+        self.save_moodle_course_announcements()
 
     @staticmethod
-    def retriever(data: list) -> tuple:
-        store = {idx["fullname"]: idx["viewurl"] for idx in data}
+    def get_course_information(course_data: list) -> Tuple:
+        store = {idx['fullname']: idx['viewurl'] for idx in course_data}
         indexed_store = {ix: name for ix, name in enumerate(store.keys(), 1)}
-        store_shorts = {idx["fullname"]: idx["shortname"] for idx in data}
+        store_shorts = {idx['fullname']: idx['shortname'] for idx in course_data}
         for i, j in indexed_store.items():
-            print("*" * 70)
+            print('*' * 70)
             print(i, j)
-        print("*" * 70)
+        print('*' * 70)
 
         while True:
             try:
-                i_input = int(input("Enter the index number of the course: "))
+                i_input = int(input('Enter the index number of the course: '))
                 selected_link = [store[indexed_store[i_input]]]
                 shortname = store_shorts[indexed_store[i_input]]
                 break
             except KeyError:
-                print("Out of index !!")
+                print('Out of index !!')
 
-        if os.name == "nt":
-            os.system("cls")
-        elif os.name == "posix":
-            os.system("clear")
-        else:
-            pass
+        clean_terminal()
         return selected_link, shortname
 
-    def save_ann_messages(self, save_all=False):
-        """Save all course announcements that you enrolled in with
-        :save_all=True"""
-        session, sesskey = self.auth_moodle()
+    def save_moodle_course_announcements(self, save_all: bool = False) -> NoReturn:
+        session, sesskey = self.login()
+        jsonfile = Config.get_moodle_taken_courses_filepath(self.userid_container[0])
+        if jsonfile.exists():
+            print(f'\nCourse database file found at {jsonfile}. Do you want to update it?')
+            action = user_interactions()
+            if action == 0:
+                self.moodle_taken_courses(session, sesskey)
+            else:
+                with jsonfile.open(mode='r', encoding='utf-8') as file:
+                    jfile = json.loads(file.read())
+                    course_data = jfile[0]['data']
+                    if save_all:
+                        urls = [course_url['viewurl'] for course_url in course_data]
+                        filename = Config.get_moodle_taken_all_course_announcements_filepath()
+                    else:
+                        urls, course_shortname = Moodle.get_course_information(course_data)
+                        course_id = urls[0].split('=')[1]
+                        filename = Config.get_moodle_course_announcement_filepath(course_id, course_shortname)
+                with filename.open(mode='w', encoding='utf-8') as ann_file:
+                    for url in urls:
+                        ann_page = session.get(url)
+                        ann_page_tree = BeautifulSoup(ann_page.content, 'html.parser')
 
-        jsonfile = Path(f"{self.path}/atilim_data/moodle/{self.userid_container[0]}_courses.json")
-        if os.path.exists(jsonfile):
-            with open(jsonfile, "r", encoding="utf-8") as j:
-                jfile = json.loads(j.read())
-                data = jfile[0]["data"]
-                if save_all:
-                    urls = [idx["viewurl"] for idx in data]
-                    filename = Path(f"{self.path}/atilim_data/moodle/my_moodle_course_announcements.html")
-                else:
-                    urls, shortname = AtilimMoodle.retriever(data)
-                    filename = Path(f"{self.path}/atilim_data/moodle/{urls[0].split('=')[1]}_{shortname}.html")
+                        wait_time = random.uniform(1.0, 2)
+                        info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                        tqdm.write(info)
+                        time.sleep(wait_time)
 
-            time_log = tqdm(total=0, bar_format="{desc}", position=1)
-            with open(filename, "w", encoding="utf-8") as af:
-                for url in urls:
-                    page = session.get(url)
-                    s = BeautifulSoup(page.content, "html.parser")
+                        try:
+                            ann_links = ann_page_tree.find_all('a', attrs={'class': 'aalink'})
+                            forum_url = r'https://moodle.atilim.edu.tr/mod/forum/view.php\?id='
+                            for ann_link in ann_links:
+                                regex = re.search(fr'{forum_url}(\d+)', str(ann_link))
+                                if regex:
+                                    ann_h = regex.group(0)
+                                    ann_messages = session.get(ann_h)
+                                    ann_messages_tree = BeautifulSoup(ann_messages.content, 'html.parser')
+                                    forum = ann_messages_tree.find_all('a', attrs={'class': 'w-100 h-100 d-block'})
+                                    announcement_urls = [announcement['href'] for announcement in forum]
 
-                    wait_time = random.uniform(1.0, 2)
-                    info = f"Waiting for {wait_time:.2f} seconds before the next request..."
-                    time_log.set_description_str(info)
-                    time.sleep(wait_time)
-
-                    try:
-                        an = s.find_all("a", attrs={"class": "aalink"})
-                        raw = r"https://moodle.atilim.edu.tr/mod/forum/view.php\?id="
-                        for i in an:
-                            raw = raw.strip()
-                            regx = re.search(fr"{raw}(\d+)", str(i))
-                            if regx:
-                                ann_h = regx.group(0)
-                                messages = session.get(ann_h)
-                                s2 = BeautifulSoup(messages.content, "html.parser")
-                                forum = s2.find_all(
-                                    "a", attrs={"class": "w-100 h-100 d-block"}
-                                )
-                                anns = [x["href"] for x in forum]
-
-                                wait_time = random.uniform(1.0, 2.4)
-                                info = f"Waiting for {wait_time:.2f} seconds before the next request..."
-                                time_log.set_description_str(info)
-                                time.sleep(wait_time)
-
-                                for ann in tqdm(anns, desc='Announcements', position=0):
-                                    msg = session.get(ann)
-                                    s3 = BeautifulSoup(msg.content, "html.parser")
-                                    d = s3.find(
-                                        "div",
-                                        attrs={"class": "d-flex flex-column w-100"},
-                                    )
-                                    af.write(str(d))
-                                    af.write("*" * 85)
-
-                                    wait_time = random.uniform(1.0, 3.4)
-                                    info = f"Waiting for {wait_time:.2f} seconds before the next request..."
-                                    time_log.set_description_str(info)
+                                    wait_time = random.uniform(1.0, 2.4)
+                                    info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                                    tqdm.write(info)
                                     time.sleep(wait_time)
 
-                    except AttributeError:
-                        pass
+                                    for ann_url in tqdm(announcement_urls, desc='Announcements'):
+                                        msg = session.get(ann_url)
+                                        msg_tree = BeautifulSoup(msg.content, 'html.parser')
+                                        msg_content = msg_tree.find('div', attrs={'class': 'd-flex flex-column w-100'})
+                                        ann_file.write(str(msg_content))
+                                        ann_file.write('*' * 85)
+
+                                        wait_time = random.uniform(1.0, 2.5)
+                                        info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                                        tqdm.write(info)
+                                        time.sleep(wait_time)
+
+                        except AttributeError:
+                            pass
         else:
-            self.taken_courses(check=True)
-
-
-if __name__ == "__main__":
-    moodle = AtilimMoodle()
-    moodle.download_files_from_course_page()
+            self.moodle_taken_courses(session, sesskey)
