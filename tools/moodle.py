@@ -1,16 +1,14 @@
-import os
 import re
 import time
 import json
 import random
 from tqdm import tqdm
-from pathlib import Path
 from bs4 import BeautifulSoup
 from datetime import datetime
 from tools.config import Config
 from tools.kiyos_auth import AtilimAuth
-from typing import Tuple, NoReturn, Any
-from tools.helpers import clean_filename, clean_terminal, user_interactions
+from typing import Tuple, NoReturn
+from tools.helpers import clean_filename, clean_terminal, user_interactions, file_format
 
 
 class Moodle:
@@ -88,40 +86,47 @@ class Moodle:
                 img_tag_name = element.find('span', attrs={'class': 'instancename'})
                 filename = img_tag_name.text.strip()
                 filetypes = {
-                    'pdf': 'pdf',
-                    'spreadsheet': 'xlsx',
-                    'document': 'docx',
-                    'powerpoint': 'pptx',
-                    'text': 'txt',
-                    'archive': 'zip',
-                    'html': 'html'
+                    'spreadsheet': '.xlsx',
+                    'document': '.docx',
+                    'powerpoint': '.pptx',
+                    'text': '.txt',
+                    'archive': '.zip',
+                    'html': '.html'
                 }
                 file_url = element.find('a')['href']
-                filetype_icon_url = img_tag['src']
-                for key, extension in filetypes.items():
-                    if key in filetype_icon_url:
-                        self.organize_files(extension, filename, file_url)
-                        break
+                file_response = session.get(file_url)
+                file_sign_header = file_response.content[:4]
+                file_extension = file_format(file_sign_header)
+                if file_extension:
+                    self.organize_files(file_extension, filename, file_url)
+                else:
+                    filetype_icon_url = img_tag['src']
+                    for key, extension in filetypes.items():
+                        if key in filetype_icon_url:
+                            self.organize_files(extension, filename, file_url)
+                            break
             except Exception as e:
                 tqdm.write(f"Error processing element: {e}")
 
         course_folder = Config.get_moodle_documents_folderpath(course_name)
-        for extension, file in self.file_dict.items():
-            for index, _ in tqdm(enumerate(file),
-                                 desc=f'{extension.capitalize()} files downloading', unit='file', total=len(extension)):
-                cleaned_filename = clean_filename(f'{file[index]['filename']}.{extension}')
-                filepath = course_folder / cleaned_filename
-                file_request = session.get(file[index]['file_url'])
-                if file_request.status_code == 200:
-                    with filepath.open(mode='wb') as f:
-                        f.write(file_request.content)
-                else:
-                    tqdm.write(f'Download Failed: {filepath.name} with status {file_request.status_code}')
+        for extension, files in self.file_dict.items():
+            with tqdm(total=len(files), desc=f'{extension.capitalize()} files downloading') as pbar:
+                for index in range(len(files)):
+                    cleaned_filename = clean_filename(f'{files[index]['filename']}{extension}')
+                    filepath = course_folder / cleaned_filename
+                    file_request = session.get(files[index]['file_url'])
+                    if file_request.status_code == 200:
+                        with filepath.open(mode='wb') as f:
+                            f.write(file_request.content)
+                        pbar.set_description(f'Downloading: {cleaned_filename}')
+                        pbar.update(1)
+                    else:
+                        tqdm.write(f'Download Failed: {filepath.name} with status {file_request.status_code}')
 
-                wait_time = random.uniform(1.0, 2.5)
-                info = f'Waiting for {wait_time:.2f} seconds before the next request...'
-                tqdm.write(info)
-                time.sleep(wait_time)
+                    wait_time = random.uniform(1.0, 2.5)
+                    # info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                    # tqdm.write(info)
+                    time.sleep(wait_time)
 
     def moodle_taken_courses(self, session, sesskey) -> NoReturn:
         params = {
@@ -192,8 +197,8 @@ class Moodle:
                         ann_page_tree = BeautifulSoup(ann_page.content, 'html.parser')
 
                         wait_time = random.uniform(1.0, 2)
-                        info = f'Waiting for {wait_time:.2f} seconds before the next request...'
-                        tqdm.write(info)
+                        # info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                        # tqdm.write(info)
                         time.sleep(wait_time)
 
                         try:
@@ -209,8 +214,8 @@ class Moodle:
                                     announcement_urls = [announcement['href'] for announcement in forum]
 
                                     wait_time = random.uniform(1.0, 2.4)
-                                    info = f'Waiting for {wait_time:.2f} seconds before the next request...'
-                                    tqdm.write(info)
+                                    # info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                                    # tqdm.write(info)
                                     time.sleep(wait_time)
 
                                     for ann_url in tqdm(announcement_urls, desc='Announcements'):
@@ -221,8 +226,8 @@ class Moodle:
                                         ann_file.write('*' * 85)
 
                                         wait_time = random.uniform(1.0, 2.5)
-                                        info = f'Waiting for {wait_time:.2f} seconds before the next request...'
-                                        tqdm.write(info)
+                                        # info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                                        # tqdm.write(info)
                                         time.sleep(wait_time)
 
                         except AttributeError:
