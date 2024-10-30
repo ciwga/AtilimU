@@ -83,7 +83,7 @@ Saves in `atilim_data/atacs` directory.
 <summary>7. Download Moodle main course page documents</summary>
 
 This option downloads course documents from the Moodle course main page.
-Supported file formats include pdf, xlsx, docx, txt, pptx, zip, and html.
+Supported file formats include PDF, BMP, BZ2, EXE, GIF, JPG, JSON, PNG, TIFF, RAR, TAR, 7Z, GZ, XZ, LZ4, LZ, CAB, RTF, XLSX, DOCX, TXT, PPTX, ZIP, and HTML.
 Saves in `atilim_data/moodle` directory.
 
 </details>
@@ -98,6 +98,11 @@ Saves in `atilim_data/unacs/graduation_photos` directory.
 
 
 ## Version History
+
+### Version 1.9
+- Support for additional file formats for downloading Moodle documents:
+  - PDF (.pdf), BMP (.bmp), BZ2 (.bz2), EXE (.exe), GIF (.gif), JPG (.jpg), JSON (.json), PNG (.png), TIFF (.tiff), RAR (.rar), TAR (.tar), 7Z (.7z), GZ (.gz), XZ (.xz), LZ4 (.lz4), LZ (.lz), CAB (.cab), RTF (.rtf).
+- Enhanced file type detection for improved downloading of Moodle documents.
 
 ### Version 1.8
 
