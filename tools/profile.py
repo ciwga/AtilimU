@@ -1,6 +1,5 @@
 import json
 from typing import Tuple
-from pathlib import Path
 from bs4 import BeautifulSoup
 from tools.config import Config
 from tools.kiyos_auth import AtilimAuth
@@ -87,8 +86,3 @@ class Profile:
                 print(f'File Created at {profile_file_path}')
         except Exception as e:
             raise SaveError(e)
-
-
-if __name__ == '__main__':
-    profile = Profile()
-    Profile.save_profile_data()
