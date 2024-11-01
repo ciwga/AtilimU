@@ -21,7 +21,6 @@ class Config:
     atacs_auth_url: str = f'{atacs_url}/Auth/AssertionConsumerService'
     atacs_inbox_url: str = f'{atacs_url}/OgrenciMesaj/Ogrenci_Gelenkutusu'
     atacs_inbox_msg_view_url: str = f'{atacs_url}/OgrenciMesaj/Ogrenci_MesajGoruntule'
-    atacs_student_adress_url: str = f'{atacs_url}//OgrenciAdres'
     atacs_student_finance_url: str = f'{atacs_url}/OgrenciFinans'
     atacs_financial_table_url: str = f'{atacs_student_finance_url}/Ogr_Bilgi_getir'
     atacs_kvkk_form_url: str = f'{atacs_url}/Kvkk/ReviewForm'
@@ -178,18 +177,22 @@ class Config:
     @staticmethod
     def get_unacs_path() -> Path:
         return Config.create_subdirectory(Config.get_data_path(), 'unacs')
+    
+    @staticmethod
+    def get_unacs_area_elective_folderpath() -> Path:
+        return Config.create_subdirectory(Config.get_unacs_path(), 'area_elective_courses')
 
     @staticmethod
     def get_unacs_current_term_opened_courses_temporary_filepath(department: str, current_term: str) -> Path:
-        return Config.get_unacs_path() / f'temp-{department}-opened-courses_{current_term}.json'
+        return Config.get_unacs_area_elective_folderpath() / f'temp-{department}-opened-courses_{current_term}.json'
 
     @staticmethod
     def get_unacs_area_elective_opened_courses_csv_filepath(department: str, current_term: str) -> Path:
-        return Config.get_unacs_path() / f'{department}-area_elective_opened_courses_{current_term}.csv'
+        return Config.get_unacs_area_elective_folderpath() / f'{department}-area_elective_opened_courses_{current_term}.csv'
 
     @staticmethod
     def get_unacs_area_elective_opened_courses_txt_filepath(department: str, current_term: str) -> Path:
-        return Config.get_unacs_path() / f'{department}-area_elective_courses_{current_term}.txt'
+        return Config.get_unacs_area_elective_folderpath() / f'{department}-area_elective_courses_{current_term}.txt'
 
     @staticmethod
     def get_unacs_graduation_photos_folderpath() -> Path:
