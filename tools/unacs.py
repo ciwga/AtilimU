@@ -234,12 +234,23 @@ class Unacs:
         existing_files = {f.name for f in filepath.iterdir() if f.is_file()}
         file_names = [file for file in file_name_list if Path(file).name not in existing_files]
 
+        if len(file_names) == 0:
+            print('All photos have been downloaded!')
+            return
+
         async def download_links(url: str, a_session, progress_bar, semaphore):
             async with semaphore:
                 a_session.headers.update({'referer': '/mezuniyet-fotograf'})
                 filename = url.split('/')[-1]
 
                 response = await a_session.get(url)
+
+                if response.status == 401:
+                    async_tqdm.write('Session expired. Re-logging...')
+                    session = cls.login()
+                    a_session.headers.update(session.headers)
+
+                    response = await a_session.get(url)
 
                 if response.status == 429:
                     async_tqdm.write('Too many requests. Waiting for a while...')
@@ -259,7 +270,7 @@ class Unacs:
                         async_tqdm.write(f'Failed to download image from {url} with status {response.status}')
                 except Exception as e:
                     async_tqdm.write(f"Error fetching {url}: {e}")
-
+   
         async def get_graduation_photos():
             semaphore = asyncio.Semaphore(8)
             async with aiohttp.ClientSession() as async_session:
