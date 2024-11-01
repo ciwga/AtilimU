@@ -5,10 +5,10 @@ from tqdm import tqdm
 from io import StringIO
 from pathlib import Path
 from bs4 import BeautifulSoup
-from typing import NoReturn, Any
 from tools.config import Config
-from tools.exceptions import SaveError
+from typing import NoReturn, Any
 from tools.kiyos_auth import AtilimAuth
+from tools.exceptions import SaveError, StudentArchiveAccessException
 
 
 class Atacs:
@@ -23,8 +23,11 @@ class Atacs:
         saml_response = soup.find('input', attrs={'name': 'SAMLResponse'})['value']
         relay_state = soup.find('input', attrs={'name': 'RelayState'})['value']
         payload = {'SAMLResponse': saml_response, 'RelayState': relay_state}
-        session.post(Config.atacs_auth_url, data=payload)
-        session.get(Config.atacs_student_adress_url)
+        auth_service = session.post(Config.atacs_auth_url, data=payload, allow_redirects=False)
+        redirection_url = auth_service.headers['Location']
+        if 'OgrenciArsivHata' in redirection_url:
+            raise StudentArchiveAccessException('Graduated students cannot access.')
+        session.get(redirection_url)
         AtilimAuth().save_cookies(session, Config.atacs_cookie_keys, 'atacs')
         return session
 
@@ -44,10 +47,11 @@ class Atacs:
             inbox_msgs_df.drop(columns=col, errors='ignore', inplace=True)
         inbox_msgs_df.columns = ["name", "surname", "subject", "date", "id"]
         inbox_msgs_df["id"] = pd.Series(message_codes)
+        pbar = tqdm(range(len(inbox_msgs_df['id'])), desc='Fetched Msg')
 
         try:
             with open(Config.get_atacs_inbox_messages_filepath(), 'a+', encoding='utf-8') as file:
-                for index in tqdm(range(len(inbox_msgs_df['id'])), desc='Fetched Msg'):
+                for index in pbar:
                     inbox_msg_url = Config.get_atacs_inbox_message_view_link(inbox_msgs_df['id'], index)
                     inbox_msg_page = session.get(inbox_msg_url, data={'Tip': '1'})
                     msg_page_soup = BeautifulSoup(inbox_msg_page.content, 'html.parser')
@@ -65,7 +69,7 @@ class Atacs:
 
                     wait_time = random.uniform(1.0, 2.8)
                     info = f'Waiting for {wait_time:.2f} seconds before the next request...'
-                    tqdm.write(info)
+                    pbar.set_postfix(info=info)
                     time.sleep(wait_time)
         except Exception as e:
             raise SaveError(f'Failed to save ATACS inbox messages: {e}')
@@ -116,8 +120,8 @@ class Atacs:
         soup = BeautifulSoup(form_webpage.content, 'html.parser')
         form_content = soup.find('div', attrs={'class': 'content'})
         try:
-            with open(Config.get_atacs_kvkk_form_filepath(), "w", encoding="utf-8") as kvkk_file:
+            with open(Config.get_atacs_kvkk_form_filepath(), 'w', encoding='utf-8') as kvkk_file:
                 kvkk_file.write(str(form_content))
-            print("Kvkk form has been saved.")
+            print('Kvkk form has been saved.')
         except Exception as e:
             raise SaveError(f'Failed to save ATACS KVKK form: {e}')

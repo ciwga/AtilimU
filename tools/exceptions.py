@@ -26,3 +26,8 @@ class NoCoursesAvailableError(Exception):
 class NotGraduatedError(Exception):
     def __init__(self, message):
         super().__init__(message)
+
+
+class StudentArchiveAccessException(Exception):
+    def __init__(self, message):
+        super().__init__(message)
