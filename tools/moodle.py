@@ -124,8 +124,8 @@ class Moodle:
                         tqdm.write(f'Download Failed: {filepath.name} with status {file_request.status_code}')
 
                     wait_time = random.uniform(1.0, 2.5)
-                    # info = f'Waiting for {wait_time:.2f} seconds before the next request...'
-                    # tqdm.write(info)
+                    info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                    pbar.set_postfix(info=info)
                     time.sleep(wait_time)
 
     def moodle_taken_courses(self, session, sesskey) -> NoReturn:
@@ -212,13 +212,14 @@ class Moodle:
                                     ann_messages_tree = BeautifulSoup(ann_messages.content, 'html.parser')
                                     forum = ann_messages_tree.find_all('a', attrs={'class': 'w-100 h-100 d-block'})
                                     announcement_urls = [announcement['href'] for announcement in forum]
+                                    pbar = tqdm(announcement_urls, desc='Announcements')
 
                                     wait_time = random.uniform(1.0, 2.4)
                                     # info = f'Waiting for {wait_time:.2f} seconds before the next request...'
                                     # tqdm.write(info)
                                     time.sleep(wait_time)
 
-                                    for ann_url in tqdm(announcement_urls, desc='Announcements'):
+                                    for ann_url in pbar:
                                         msg = session.get(ann_url)
                                         msg_tree = BeautifulSoup(msg.content, 'html.parser')
                                         msg_content = msg_tree.find('div', attrs={'class': 'd-flex flex-column w-100'})
@@ -226,8 +227,8 @@ class Moodle:
                                         ann_file.write('*' * 85)
 
                                         wait_time = random.uniform(1.0, 2.5)
-                                        # info = f'Waiting for {wait_time:.2f} seconds before the next request...'
-                                        # tqdm.write(info)
+                                        info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                                        pbar.set_postfix(info=info)
                                         time.sleep(wait_time)
 
                         except AttributeError:
