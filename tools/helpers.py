@@ -59,3 +59,20 @@ def file_format(file_signature: bytes):
         if file_signature.startswith(signature):
             return extension
     return None
+
+
+def select_from_response_data(response: list, term_name_key: str, term_id_key: str):
+    selection_dict = {term[term_name_key]: term[term_id_key] for term in response}
+    
+    for index, term_name in enumerate(selection_dict.keys()):
+        print(f'{index}: {term_name}')
+
+    while True:
+        try:
+            choice = int(input('Enter your choice number: '))
+            if 0 <= choice < len(selection_dict):
+                return str(list(selection_dict.keys())[choice]), int(list(selection_dict.values())[choice])
+            else:
+                print('Invalid selection! Please try again.')
+        except ValueError:
+            print('Invalid input! Please enter a number.')

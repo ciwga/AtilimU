@@ -15,8 +15,8 @@ from tools.config import Config
 from tools.profile import Profile
 from tools.curriculum import Curriculum
 from tools.kiyos_auth import AtilimAuth
-from tools.helpers import user_interactions
 from tqdm.asyncio import tqdm as async_tqdm
+from tools.helpers import user_interactions, select_from_response_data
 from tools.exceptions import NoCoursesAvailableError, NotGraduatedError
 
 
@@ -87,19 +87,27 @@ class Unacs:
         session = Unacs.login()
         session.headers['referer'] = Config.unacs_opened_courses_referer_url
         terms_list = session.get(Config.unacs_term_courses_url)
-        print(terms_list.status_code)
         if terms_list.status_code == 403:
             raise ConnectionError('Have you graduated? If your answer is yes, you cannot reach the website.')
         if terms_list.json()['success'] is False:
             raise ConnectionError('Something goes wrong. Try again...')
-        current_term_card = terms_list.json()['responseData'][0]
-        current_term = current_term_card['id']
-        current_term_name_en = current_term_card['aD_EN']
-        # current_term_name_tr = current_term_card['ad']
+        current_term_card = terms_list.json()['responseData']
+        # current_term_name_tr = 'ad'
+        current_term_name_en, current_term = select_from_response_data(current_term_card, 'aD_EN', 'id')
         temp_file = Config.get_unacs_current_term_opened_courses_temporary_filepath(department_name, current_term)
         if temp_file.exists():
             temp_file.unlink(missing_ok=True)
 
+        test_payload = {
+            'BOLUM_ID': 141,    #  mechatronics
+            'DERS_ID': -1,
+            'DONEM_ID': current_term,
+            'FAKULTE_ID': 2,    #  engineering
+        }
+        test_request = session.post(Config.unacs_opened_courses_url, json=test_payload)
+        if not test_request.json()['responseData']:
+            raise NoCoursesAvailableError(f'There are no available courses in {current_term_name_en}') 
+        
         status_bar = tqdm(total=0, bar_format='{desc}', position=1)
         with (tqdm(total=len(area_elective_courses_ids),
                    desc=f'Fetching Courses', position=0) as pbar):
@@ -113,17 +121,15 @@ class Unacs:
                 course = session.post(Config.unacs_opened_courses_url, json=payload)
 
                 if course.status_code == 200:
-                    course = course.json()['responseData']
-                    if len(course) == 0:
-                        raise NoCoursesAvailableError(f'There are no available courses in {current_term_name_en}')
+                    course = course.json()['responseData']           
 
                     if course:
                         with open(temp_file, 'a+', encoding='utf-8') as f:
                             json.dump(course, f, ensure_ascii=False, indent=4)
 
-                wait_time = random.uniform(1.0, 2.7)
+                wait_time = random.uniform(1.0, 1.8)
                 info = f'Waiting for {wait_time:.2f} seconds before the next request...'
-                status_bar.set_description(info)
+                pbar.set_postfix(info=info)
                 time.sleep(wait_time)
                 pbar.update()
 
@@ -202,6 +208,9 @@ class Unacs:
                     )
                     with open(textfile_name, 'a+', encoding='utf-8') as textfile_false:
                         textfile_false.write(output_not_opened + '\n')
+        print('You can find the available area elective courses in the files mentioned below.')
+        print(f'TXT File Created at {textfile_name}')
+        print(f'CSV File Created at {area_elective_csv_file}')
         temp_file.unlink()
 
     @classmethod
@@ -264,8 +273,11 @@ class Unacs:
                         async with aiofiles.open(f'{filepath}/{filename}', 'wb') as file:
                             await file.write(image_data)
 
+                        wait_time = random.uniform(1, 2)
+                        info = f'Waiting for {wait_time:.2f} seconds before the next request...'
+                        progress_bar.set_postfix(info=info)
                         progress_bar.update(1)
-                        await asyncio.sleep(random.uniform(1, 2))
+                        await asyncio.sleep(wait_time)
                     else:
                         async_tqdm.write(f'Failed to download image from {url} with status {response.status}')
                 except Exception as e:
