@@ -2,35 +2,6 @@
 
 ## Features
 
-1. Save your personal information.
-2. Save all ATACS messages.
-3. Save announcements from Moodle lessons.
-4. Check opened area elective courses.
-5. Save your financial pay table.
-6. Save your KVKK form.
-7. Download Moodle main course page documents.
-8. Download graduation photos.
-
-## Installation
-
-To use this tool, clone the repository and install the required dependencies:
-
-```bash
-git clone https://github.com/ciwga/AtilimU.git
-cd AtilimU
-pip install -r requirements.txt
-```
-
-## Usage
-
-Run the main program using:
-
-```bash
-python main.py
-```
-
-### Descriptions of Operations
-
 <details>
 <summary>1. Save your personal information</summary>
 
@@ -97,7 +68,30 @@ Saves in `atilim_data/unacs/graduation_photos` directory.
 </details>
 
 
+## Installation
+
+To use this tool, clone the repository and install the required dependencies:
+
+```bash
+git clone https://github.com/ciwga/AtilimU.git
+cd AtilimU
+pip install -r requirements.txt
+```
+
+## Usage
+
+Run the main program using:
+
+```bash
+python main.py
+```
+
 ## Version History
+
+### Version 2.0
+- In the [unacs](tools/unacs.py) file, users can now select the current term from a list of available options instead of automatically using the latest term.
+- The [atacs](tools/atacs.py) file was updated to ensure that graduates, who cannot access the site, receive an appropriate error message when attempting to log in.
+- Minor bug fixes were implemented to improve overall functionality and user experience.
 
 ### Version 1.9
 - Support for additional file formats for downloading Moodle documents:
