@@ -108,7 +108,6 @@ class Unacs:
         if not test_request.json()['responseData']:
             raise NoCoursesAvailableError(f'There are no available courses in {current_term_name_en}') 
         
-        status_bar = tqdm(total=0, bar_format='{desc}', position=1)
         with (tqdm(total=len(area_elective_courses_ids),
                    desc=f'Fetching Courses', position=0) as pbar):
             for course_id in area_elective_courses_ids:
